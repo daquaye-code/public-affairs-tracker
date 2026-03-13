@@ -148,7 +148,7 @@ export default function SubmissionPage() {
 
         {selectedOfficer && (
           <div>
-            <label className="label">Area Office</label>
+            <label className="label">Unit</label>
             <div className="input bg-gray-50 text-gray-600 cursor-not-allowed">
               {selectedOfficer.area_office}
             </div>

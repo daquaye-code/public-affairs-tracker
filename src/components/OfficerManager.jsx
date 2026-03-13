@@ -16,7 +16,7 @@ export default function OfficerManager({ officers, onReload }) {
 
   async function handleAdd() {
     if (!newName.trim() || !newOffice.trim()) {
-      toast.error('Both name and area office are required.');
+      toast.error('Both name and unit are required.');
       return;
     }
     setBusy(true);
@@ -99,7 +99,7 @@ export default function OfficerManager({ officers, onReload }) {
           />
           <input
             className="input flex-1"
-            placeholder="Area office"
+            placeholder="Unit"
             value={newOffice}
             onChange={(e) => setNewOffice(e.target.value)}
           />

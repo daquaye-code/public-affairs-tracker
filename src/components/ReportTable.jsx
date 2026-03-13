@@ -31,7 +31,7 @@ export default function ReportTable({
                 Officer
               </th>
               <th className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">
-                Area Office
+                Unit
               </th>
               {(reportTypes || []).map((rt) => (
                 <th

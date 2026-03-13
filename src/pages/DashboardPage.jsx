@@ -78,7 +78,7 @@ export default function DashboardPage() {
   function handleExport() {
     const headers = [
       'Officer',
-      'Area Office',
+      'Unit',
       ...reportTypes.map((rt) => rt.name),
       'Progress',
     ];
