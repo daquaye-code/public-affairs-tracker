@@ -1,159 +1,129 @@
-import { useState, useEffect, useCallback } from 'react';
-import toast from 'react-hot-toast';
-import { RefreshCw, ToggleLeft } from 'lucide-react';
-import { fetchOfficers, fetchReportTypes, fetchSubmissions, upsertSubmission } from '../lib/api';
-import { getCurrentMonth, formatMonthLabel } from '../utils/helpers';
-import MonthSelector from '../components/MonthSelector';
+import { useState } from 'react';
+import { Users, FileText, ToggleLeft, Lock } from 'lucide-react';
+import { useOfficers, useReportTypes, useSubmissions } from '../hooks/useData';
+import { getCurrentMonth } from '../utils/months';
 import OfficerManager from '../components/OfficerManager';
 import ReportTypeManager from '../components/ReportTypeManager';
-import ReportStatusPill from '../components/ReportStatusPill';
+import ManualOverride from '../components/ManualOverride';
 import LoadingSpinner from '../components/LoadingSpinner';
 
+const ADMIN_PASSWORD = 'ssnit2026';
+
+const tabs = [
+  { id: 'officers', label: 'Officers', icon: Users },
+  { id: 'report-types', label: 'Report Types', icon: FileText },
+  { id: 'override', label: 'Manual Override', icon: ToggleLeft },
+];
+
 export default function AdminPage() {
-  const [officers, setOfficers] = useState([]);
-  const [reportTypes, setReportTypes] = useState([]);
-  const [submissions, setSubmissions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [month, setMonth] = useState(getCurrentMonth());
-  const [toggling, setToggling] = useState(null);
+  const [unlocked, setUnlocked] = useState(false);
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState('officers');
+  const [overrideMonth, setOverrideMonth] = useState(getCurrentMonth);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [o, rt, s] = await Promise.all([
-        fetchOfficers(),
-        fetchReportTypes(),
-        fetchSubmissions(month),
-      ]);
-      setOfficers(o);
-      setReportTypes(rt);
-      setSubmissions(s);
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setLoading(false);
+  const { officers, loading: loadingOfficers, reload: reloadOfficers } = useOfficers();
+  const { reportTypes, loading: loadingTypes, reload: reloadTypes } = useReportTypes();
+  const {
+    submissions,
+    loading: loadingSubs,
+    reload: reloadSubs,
+  } = useSubmissions(overrideMonth);
+
+  function handleLogin(e) {
+    e.preventDefault();
+    if (password === ADMIN_PASSWORD) {
+      setUnlocked(true);
+      setError('');
+    } else {
+      setError('Incorrect password. Try again.');
     }
-  }, [month]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const submissionMap = {};
-  for (const s of submissions) {
-    submissionMap[`${s.officer_id}::${s.report_type_id}`] = s;
   }
 
-  const handleToggle = async (officerId, reportTypeId) => {
-    const key = `${officerId}::${reportTypeId}`;
-    const existing = submissionMap[key];
-    const newStatus = !(existing?.submitted ?? false);
-    setToggling(key);
-    try {
-      await upsertSubmission({
-        officer_id: officerId,
-        report_type_id: reportTypeId,
-        report_month: month,
-        submitted: newStatus,
-        notes: existing?.notes || '',
-      });
-      toast.success(`Status updated`);
-      load();
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setToggling(null);
-    }
-  };
-
-  if (loading) return <LoadingSpinner />;
-
-  return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="font-display text-xl font-bold text-slate-900">Admin Panel</h1>
-          <p className="text-sm text-slate-500">Manage officers, report types, and overrides.</p>
-        </div>
-        <button
-          onClick={load}
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50"
-        >
-          <RefreshCw size={14} />
-          Refresh
-        </button>
-      </div>
-
-      {/* Two-column management */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-          <OfficerManager officers={officers} onRefresh={load} />
-        </div>
-        <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-          <ReportTypeManager reportTypes={reportTypes} onRefresh={load} />
-        </div>
-      </div>
-
-      {/* Manual Override Section */}
-      <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="flex items-center gap-2 font-display text-base font-bold text-slate-900">
-              <ToggleLeft size={18} className="text-brand-500" />
-              Manual Override
-            </h3>
-            <p className="mt-1 text-sm text-slate-500">
-              Toggle submission statuses for {formatMonthLabel(month)}.
+  if (!unlocked) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="card p-6 sm:p-8 w-full max-w-sm">
+          <div className="flex flex-col items-center gap-3 mb-6">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-50">
+              <Lock size={22} className="text-brand-600" />
+            </div>
+            <h2 className="font-display text-lg font-semibold text-gray-900">
+              Admin Access
+            </h2>
+            <p className="text-sm text-gray-500 text-center">
+              Enter the admin password to continue.
             </p>
           </div>
-          <MonthSelector value={month} onChange={setMonth} />
+          <div>
+            <input
+              type="password"
+              className="input mb-3"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleLogin(e)}
+            />
+            {error && (
+              <p className="text-xs text-red-600 mb-3">{error}</p>
+            )}
+            <button onClick={handleLogin} className="btn-primary w-full">
+              Unlock
+            </button>
+          </div>
         </div>
+      </div>
+    );
+  }
 
-        {officers.length === 0 || reportTypes.length === 0 ? (
-          <div className="mt-4 rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-            {officers.length === 0
-              ? 'Add officers above to use manual override.'
-              : 'Add report types above to use manual override.'}
-          </div>
-        ) : (
-          <div className="mt-4 overflow-x-auto scrollbar-thin">
-            <table className="w-full min-w-[500px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  <th className="px-3 py-2 font-semibold text-slate-600">Officer</th>
-                  {reportTypes.map((rt) => (
-                    <th key={rt.id} className="px-3 py-2 text-center font-semibold text-slate-600">
-                      {rt.name}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {officers.map((officer) => (
-                  <tr key={officer.id}>
-                    <td className="px-3 py-2 font-medium text-slate-800">
-                      {officer.full_name}
-                    </td>
-                    {reportTypes.map((rt) => {
-                      const key = `${officer.id}::${rt.id}`;
-                      const isSubmitted = submissionMap[key]?.submitted ?? false;
-                      return (
-                        <td key={rt.id} className="px-3 py-2 text-center">
-                          <button
-                            onClick={() => handleToggle(officer.id, rt.id)}
-                            disabled={toggling === key}
-                            className="transition-transform hover:scale-105 disabled:opacity-50"
-                          >
-                            <ReportStatusPill submitted={isSubmitted} />
-                          </button>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+  const loading = loadingOfficers || loadingTypes;
+
+  if (loading) return <LoadingSpinner message="Loading admin..." />;
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div>
+        <h1 className="font-display text-2xl font-bold text-gray-900 tracking-tight">
+          Admin Panel
+        </h1>
+        <p className="text-sm text-gray-500 mt-0.5">
+          Manage officers, report types, and override statuses.
+        </p>
+      </div>
+
+      <div className="flex gap-1 p-1 rounded-xl bg-gray-100 w-fit">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+              activeTab === tab.id
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <tab.icon size={16} />
+            <span className="hidden sm:inline">{tab.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="card p-5 sm:p-6">
+        {activeTab === 'officers' && (
+          <OfficerManager officers={officers} onReload={reloadOfficers} />
+        )}
+        {activeTab === 'report-types' && (
+          <ReportTypeManager reportTypes={reportTypes} onReload={reloadTypes} />
+        )}
+        {activeTab === 'override' && (
+          <ManualOverride
+            officers={officers}
+            reportTypes={reportTypes}
+            submissions={submissions}
+            onReloadSubs={reloadSubs}
+            month={overrideMonth}
+            onMonthChange={setOverrideMonth}
+          />
         )}
       </div>
     </div>
